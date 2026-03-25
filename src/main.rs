@@ -1,15 +1,15 @@
 use std::str::FromStr;
 
+use crate::cipher_data::CipherData;
 use clap::{Parser, command};
 use postcard::fixint::le;
-use rand::seq::SliceRandom;
 use rand::rngs::SysRng;
-use crate::cipher_data::CipherData;
+use rand::seq::SliceRandom;
 
 mod cipher_data;
 mod error;
 mod util;
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 enum Mode {
     Encrypt,
     Decrypt,
@@ -27,7 +27,7 @@ impl FromStr for Mode {
 }
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct VailArgs{
+struct VailArgs {
     #[arg(short, long, value_parser = clap::value_parser!(Mode))]
     mode: Mode,
     #[arg(short, long)]
@@ -36,36 +36,36 @@ struct VailArgs{
     input: String,
 }
 #[cfg(test)]
-mod tests{
+mod tests {
     use rand::rngs::SysRng;
 
     use crate::cipher_data::CipherData;
 
     #[test]
-    fn test(){
+    fn test() {
         let text = "Hello, World!";
-        let mut rng =SysRng::default();
+        let mut rng = SysRng::default();
         let cipher_data = CipherData::new(&mut rng, None).unwrap();
-        let encrypted = cipher_data.encrypt_blocks(text, &mut rng);  
+        let encrypted = cipher_data.encrypt_blocks(text, &mut rng);
         let decrypted = cipher_data.decrypt_blocks(&encrypted);
         assert_eq!(text, decrypted);
     }
 }
 
 fn main() {
-    let mut rng =SysRng::default();
+    let mut rng = SysRng::default();
     let args = VailArgs::parse();
-    match (args.mode,args.data_path) {
-        (Mode::Encrypt,  data_path) => {
+    match (args.mode, args.data_path) {
+        (Mode::Encrypt, data_path) => {
             let cipher_data = CipherData::new(&mut rng, data_path).unwrap();
-            let cipher_text = cipher_data.encrypt_blocks(&args.input,&mut rng);
+            let cipher_text = cipher_data.encrypt_blocks(&args.input, &mut rng);
             println!("{}", cipher_text);
-        },
-        (Mode::Decrypt,  data_path) => {
+        }
+        (Mode::Decrypt, data_path) => {
             let cipher_data = CipherData::new(&mut rng, data_path).unwrap();
             let plain_text = cipher_data.decrypt_blocks(&args.input);
             println!("{}", plain_text);
-        },
+        }
         _ => {
             println!("Invalid arguments. Please provide mode and input.");
         }

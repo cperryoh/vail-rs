@@ -1,11 +1,9 @@
 use rand::{TryRng, rngs::SysRng};
 
-
 pub fn make_key(len: usize, adjusted_char_space: &[char], rng: &mut SysRng) -> String {
     let mut key: Vec<char> = Vec::with_capacity(len);
     for _ in 0..len {
-        let index: usize =
-            range(0, adjusted_char_space.len().try_into().unwrap(), rng) as usize;
+        let index: usize = range(0, adjusted_char_space.len().try_into().unwrap(), rng) as usize;
         let c = adjusted_char_space[index];
         key.push(c);
     }

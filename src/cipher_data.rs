@@ -9,11 +9,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{error, util};
 use rand::{TryRng, distr::Open01, rngs::SysRng};
-const CHAR_SPACE: [char;79] = [
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 
-     ',', '.', '?', '&', '%', '!', '1', '2', '3', '4', '5', '6',
-    '7', '8', '9', '0', '/', ':', ';', '=', '<', '>', '#', '~', '^', '_', '@',
+const CHAR_SPACE: [char; 79] = [
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+    't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
+    'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ',', '.', '?', '&', '%',
+    '!', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '/', ':', ';', '=', '<', '>', '#', '~',
+    '^', '_', '@',
 ];
 const POSSIBLE_SPACE_MAPPINGS: [char; 4] = ['~', '^', '_', '@'];
 #[derive(Serialize, Deserialize, Debug)]
@@ -167,7 +168,6 @@ impl CipherData {
             data.level_keys.push(key);
         }
         data.write_to_disk(&resolved_path)?;
-        
 
         Ok(data)
     }
