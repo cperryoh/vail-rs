@@ -8,7 +8,7 @@ use error::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::{error, util};
-use rand::{TryRng, distr::Open01, rngs::SysRng};
+use rand::rngs::SysRng;
 const CHAR_SPACE: [char; 79] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
     't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
@@ -30,7 +30,7 @@ pub struct CipherData {
 impl CipherData {
     fn from_file(file_path: &str) -> Result<CipherData> {
         let bytes = read(file_path)?;
-        let data = postcard::from_bytes::<CipherData>(&bytes)?.into();
+        let data = postcard::from_bytes::<CipherData>(&bytes)?;
         Ok(data)
     }
     fn write_to_disk(&self, file_path: &str) -> Result<()> {
@@ -120,8 +120,8 @@ impl CipherData {
     }
     pub fn new(rng: &mut SysRng, data_path: Option<String>) -> Result<Self> {
         let resolved_path = data_path.as_deref().unwrap_or("data.dat");
-        if std::fs::exists(&resolved_path)? {
-            return Ok(Self::from_file(&resolved_path)?);
+        if std::fs::exists(resolved_path)? {
+            return Self::from_file(resolved_path);
         }
         let space_mapping = util::choose(&POSSIBLE_SPACE_MAPPINGS, rng);
         let possible_div_mappings: Vec<char> = POSSIBLE_SPACE_MAPPINGS
@@ -136,8 +136,8 @@ impl CipherData {
             reverse_mix_ups: HashMap::new(),
             level_keys: Vec::new(),
             mixup_keys: Vec::new(),
-            space_mapping: space_mapping,
-            div_mapping: div_mapping,
+            space_mapping,
+            div_mapping,
         };
         let adjusted_char_space: Vec<char> = CHAR_SPACE
             .iter()
@@ -167,7 +167,7 @@ impl CipherData {
             data.levels.insert(key.clone(), i);
             data.level_keys.push(key);
         }
-        data.write_to_disk(&resolved_path)?;
+        data.write_to_disk(resolved_path)?;
 
         Ok(data)
     }

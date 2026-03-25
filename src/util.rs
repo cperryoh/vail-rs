@@ -9,7 +9,7 @@ pub fn make_key(len: usize, adjusted_char_space: &[char], rng: &mut SysRng) -> S
     }
     key.into_iter().collect()
 }
-pub fn shuffle<T>(vec: &mut Vec<T>, rng: &mut SysRng) {
+pub fn shuffle<T>(vec: &mut [T], rng: &mut SysRng) {
     for i in (1..vec.len()).rev() {
         let j = range(0, vec.len().try_into().unwrap(), rng) as usize;
         vec.swap(i, j);

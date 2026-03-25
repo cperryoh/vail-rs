@@ -1,10 +1,8 @@
 use std::str::FromStr;
 
 use crate::cipher_data::CipherData;
-use clap::{Parser, command};
-use postcard::fixint::le;
+use clap::Parser;
 use rand::rngs::SysRng;
-use rand::seq::SliceRandom;
 
 mod cipher_data;
 mod error;
@@ -44,7 +42,7 @@ mod tests {
     #[test]
     fn test() {
         let text = "Hello, World!";
-        let mut rng = SysRng::default();
+        let mut rng = SysRng;
         let cipher_data = CipherData::new(&mut rng, None).unwrap();
         let encrypted = cipher_data.encrypt_blocks(text, &mut rng);
         let decrypted = cipher_data.decrypt_blocks(&encrypted);
@@ -53,7 +51,7 @@ mod tests {
 }
 
 fn main() {
-    let mut rng = SysRng::default();
+    let mut rng = SysRng;
     let args = VailArgs::parse();
     match (args.mode, args.data_path) {
         (Mode::Encrypt, data_path) => {
@@ -65,9 +63,6 @@ fn main() {
             let cipher_data = CipherData::new(&mut rng, data_path).unwrap();
             let plain_text = cipher_data.decrypt_blocks(&args.input);
             println!("{}", plain_text);
-        }
-        _ => {
-            println!("Invalid arguments. Please provide mode and input.");
         }
     }
 }
