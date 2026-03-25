@@ -8,6 +8,7 @@ use crate::cipher_data::CipherData;
 
 mod cipher_data;
 mod error;
+mod util;
 #[derive(Debug,Clone)]
 enum Mode {
     Encrypt,

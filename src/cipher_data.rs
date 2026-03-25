@@ -7,7 +7,7 @@ use std::{
 use error::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::error;
+use crate::{error, util};
 use rand::{TryRng, distr::Open01, rngs::SysRng};
 const CHAR_SPACE: [char;79] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 
@@ -36,16 +36,6 @@ impl CipherData {
         let bytes = postcard::to_allocvec(self)?;
         fs::write(file_path, bytes)?;
         Ok(())
-    }
-    fn make_key(len: usize, adjusted_char_space: &[char], rng: &mut SysRng) -> String {
-        let mut key: Vec<char> = Vec::with_capacity(len);
-        for _ in 0..len {
-            let index: usize =
-                Self::range(0, adjusted_char_space.len().try_into().unwrap(), rng) as usize;
-            let c = adjusted_char_space[index];
-            key.push(c);
-        }
-        key.into_iter().collect()
     }
     pub fn remove_cipher(&self, cipher_text: &str) -> String {
         let cut_string = cipher_text[3..].to_string();
@@ -102,7 +92,7 @@ impl CipherData {
     }
     pub fn encrypt_cipher(&self, plain_text: &str, rand: &mut SysRng) -> String {
         let plain_text = plain_text.chars().collect::<String>();
-        let level_key = Self::choose::<String>(&self.level_keys, rand);
+        let level_key = util::choose::<String>(&self.level_keys, rand);
         let level = self.levels.get(&level_key).unwrap();
         let mut out = plain_text.to_string();
         for _ in 0..*level {
@@ -111,7 +101,7 @@ impl CipherData {
         format!("{}{}", level_key, out)
     }
     pub fn add_cipher(&self, plain_text: &str, rng: &mut SysRng) -> String {
-        let key = Self::choose::<String>(&self.mixup_keys, rng);
+        let key = util::choose::<String>(&self.mixup_keys, rng);
         let mixup = self.mix_ups.get(&key).unwrap();
         let cipher_text: String = plain_text
             .chars()
@@ -127,33 +117,18 @@ impl CipherData {
             .collect();
         format!("{}{}", key, cipher_text)
     }
-    pub fn shuffle<T>(vec: &mut Vec<T>, rng: &mut SysRng) {
-        for i in (1..vec.len()).rev() {
-            let j = Self::range(0, vec.len().try_into().unwrap(), rng) as usize;
-            vec.swap(i, j);
-        }
-    }
-    pub fn range(start: i32, end: i32, rng: &mut SysRng) -> i32 {
-        let range = end - start;
-        let num = rng.try_next_u32().unwrap() % (range as u32);
-        start + num as i32
-    }
-    pub fn choose<T: Clone>(vec: &[T], rng: &mut SysRng) -> T {
-        let index = Self::range(0, vec.len() as i32, rng) as usize;
-        vec[index].clone()
-    }
     pub fn new(rng: &mut SysRng, data_path: Option<String>) -> Result<Self> {
         let resolved_path = data_path.as_deref().unwrap_or("data.dat");
         if std::fs::exists(&resolved_path)? {
             return Ok(Self::from_file(&resolved_path)?);
         }
-        let space_mapping = Self::choose(&POSSIBLE_SPACE_MAPPINGS, rng);
+        let space_mapping = util::choose(&POSSIBLE_SPACE_MAPPINGS, rng);
         let possible_div_mappings: Vec<char> = POSSIBLE_SPACE_MAPPINGS
             .iter()
             .filter(|c| **c != space_mapping)
             .cloned()
             .collect();
-        let div_mapping = Self::choose(&possible_div_mappings, rng);
+        let div_mapping = util::choose(&possible_div_mappings, rng);
         let mut data = Self {
             levels: HashMap::new(),
             mix_ups: HashMap::new(),
@@ -169,9 +144,9 @@ impl CipherData {
             .cloned()
             .collect();
         for _ in 0..100 {
-            let key = Self::make_key(3, &adjusted_char_space, rng);
+            let key = util::make_key(3, &adjusted_char_space, rng);
             let mut mixup: Vec<char> = adjusted_char_space.to_vec();
-            Self::shuffle(&mut mixup, rng);
+            util::shuffle(&mut mixup, rng);
             let mut mixup_map: HashMap<char, char> = HashMap::new();
             let mut reverse_mixup_map: HashMap<char, char> = HashMap::new();
             for i in 0..adjusted_char_space.len() {
@@ -186,8 +161,8 @@ impl CipherData {
         }
 
         for _ in 0..10 {
-            let key = Self::make_key(2, &adjusted_char_space, rng);
-            let i = Self::range(10, 20, rng);
+            let key = util::make_key(2, &adjusted_char_space, rng);
+            let i = util::range(10, 20, rng);
             data.levels.insert(key.clone(), i);
             data.level_keys.push(key);
         }
