@@ -32,20 +32,23 @@ struct VailArgs {
     data_path: Option<String>,
     #[arg(short, long)]
     input: String,
+    #[arg(short, long)]
+    secret: String
 }
 #[cfg(test)]
 mod tests {
-    use rand::rngs::SysRng;
+    use rand::{TryRng, rngs::SysRng};
 
     use crate::cipher_data::CipherData;
 
     #[test]
     fn test() {
-        let text = "Hello, World!";
+        let test_secret ="This is a test secret for the cipher data struct";
         let mut rng = SysRng;
+        let text = "Hello, World!";
         let cipher_data = CipherData::new(&mut rng, None).unwrap();
-        let encrypted = cipher_data.encrypt_blocks(text, &mut rng);
-        let decrypted = cipher_data.decrypt_blocks(&encrypted);
+        let encrypted = cipher_data.encrypt_blocks(text, test_secret);
+        let decrypted = cipher_data.decrypt_blocks(&encrypted,test_secret);
         assert_eq!(text, decrypted);
     }
 }
@@ -56,12 +59,12 @@ fn main() {
     match (args.mode, args.data_path) {
         (Mode::Encrypt, data_path) => {
             let cipher_data = CipherData::new(&mut rng, data_path).unwrap();
-            let cipher_text = cipher_data.encrypt_blocks(&args.input, &mut rng);
+            let cipher_text = cipher_data.encrypt_blocks(&args.input, &args.secret);
             println!("{}", cipher_text);
         }
         (Mode::Decrypt, data_path) => {
             let cipher_data = CipherData::new(&mut rng, data_path).unwrap();
-            let plain_text = cipher_data.decrypt_blocks(&args.input);
+            let plain_text = cipher_data.decrypt_blocks(&args.input, &args.secret);
             println!("{}", plain_text);
         }
     }

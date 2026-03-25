@@ -5,10 +5,12 @@ use std::{
 };
 
 use error::Result;
+use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
-use crate::{error, util};
-use rand::rngs::SysRng;
+use crate::{ error, util};
+use rand::{SeedableRng, TryRng, rngs::{StdRng, SysRng}};
 const CHAR_SPACE: [char; 79] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
     't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
@@ -26,6 +28,7 @@ pub struct CipherData {
     mixup_keys: Vec<String>,
     space_mapping: char,
     div_mapping: char,
+    data_id:[u8;32] 
 }
 impl CipherData {
     fn from_file(file_path: &str) -> Result<CipherData> {
@@ -51,9 +54,19 @@ impl CipherData {
             .collect();
         cut_string
     }
-    pub fn decrypt_cipher(&self, cipher_text: &str) -> String {
-        let level_key = cipher_text.chars().take(2).collect::<String>();
-        let level = self.levels.get(&level_key).unwrap();
+    pub fn decrypt_cipher(&self, cipher_text: &str,secret: &str) -> String {
+        let (nonce_base64, cipher_text) = cipher_text.split_once('+').expect("Invalid cipher text format");
+        let nonce_bytes = general_purpose::STANDARD.decode(nonce_base64).expect("Invalid nonce encoding");
+        let seed = self.derive_seed(&nonce_bytes,secret);
+        let level_val:u32= u32::from_be_bytes(seed[0..4].try_into().unwrap());
+        let level_key = &self.level_keys[level_val as usize% self.level_keys.len()];
+
+        let mixup_val:u32= u32::from_be_bytes(seed[4..8].try_into().unwrap());
+        let mixup_key = &self.mixup_keys[mixup_val as usize % self.mixup_keys.len()];
+        let mixup = self.reverse_mix_ups.get(mixup_key).unwrap();
+        let cipher_text = cipher_text.chars().map(|c| if c == self.space_mapping { ' ' } else { *mixup.get(&c).unwrap() }).collect::<String>();
+
+        let level = self.levels.get(level_key).unwrap();
         let cut_string = cipher_text[2..].to_string();
         let mut out = cut_string;
         for _ in 0..*level {
@@ -61,10 +74,9 @@ impl CipherData {
         }
         out
     }
-    pub fn encrypt_blocks(&self, plain_text: &str, rand: &mut SysRng) -> String {
+    pub fn encrypt_blocks(&self, plain_text: &str, secret: &str) -> String {
         let plain_blocks: Vec<String> = plain_text
             .chars()
-            .map(|c| if c == ' ' { self.space_mapping } else { c })
             .collect::<String>()
             .chars()
             .collect::<Vec<char>>()
@@ -73,35 +85,67 @@ impl CipherData {
             .collect();
         let encrypted_blocks: Vec<String> = plain_blocks
             .iter()
-            .map(|block| self.encrypt_cipher(block, rand))
+            .map(|block| self.encrypt_cipher(block, secret))
             .collect();
         encrypted_blocks.join(self.div_mapping.to_string().as_str())
     }
-    pub fn decrypt_blocks(&self, cipher_text: &str) -> String {
+    pub fn decrypt_blocks(&self, cipher_text: &str,secret: &str) -> String {
         let cipher_blocks: Vec<String> = cipher_text
             .chars()
-            .map(|c| if c == self.space_mapping { ' ' } else { c })
             .collect::<String>()
             .split(self.div_mapping.to_string().as_str())
             .map(|s| s.to_string())
             .collect();
         let decrypted_blocks: Vec<String> = cipher_blocks
             .iter()
-            .map(|block| self.decrypt_cipher(block))
+            .map(|block| self.decrypt_cipher(block,secret))
             .collect();
         decrypted_blocks.join("")
     }
-    pub fn encrypt_cipher(&self, plain_text: &str, rand: &mut SysRng) -> String {
+
+    fn derive_seed(&self, nonce: &[u8],secret: &str) -> [u8;32] {
+
+        // Replace this with whatever stable secret material you want from .dat
+        let mut hasher:Sha256= Digest::new();
+        
+
+        // Public nonce
+        hasher.update(&self.data_id);
+        hasher.update(nonce);
+        hasher.update(secret.as_bytes());
+
+        let digest = hasher.finalize();
+
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&digest);
+        seed
+    }
+
+    pub fn encrypt_cipher(&self, plain_text: &str,secret: &str) -> String {
+        let mut nonce = [0u8; 12];
+        let plain_text:String = plain_text.chars().map(|c| if c==' ' {self.space_mapping} else {c}).collect();
+        let mut rng = SysRng;
+        rng.try_fill_bytes(&mut nonce).expect("Failed to make nonce");
+        let seed = self.derive_seed(&nonce,secret);
+        let mut rng = StdRng::from_seed(seed);
+        let level_val:u32= u32::from_be_bytes(seed[0..4].try_into().unwrap());
+        let mixup_val:u32= u32::from_be_bytes(seed[4..8].try_into().unwrap());
+
         let plain_text = plain_text.chars().collect::<String>();
-        let level_key = util::choose::<String>(&self.level_keys, rand);
-        let level = self.levels.get(&level_key).unwrap();
+        let level_key = &self.level_keys[level_val as usize% self.level_keys.len()];
+        let level = self.levels.get(level_key).unwrap();
         let mut out = plain_text.to_string();
         for _ in 0..*level {
-            out = self.add_cipher(&out, rand);
+            out = self.add_cipher(&out, &mut rng);
         }
-        format!("{}{}", level_key, out)
+        let last_mixup_index = mixup_val as usize % self.mixup_keys.len();
+        let last_mixup_key = &self.mixup_keys[last_mixup_index];
+        let last_mixup = self.mix_ups.get(last_mixup_key).unwrap();
+        out = format!("{}{}", level_key, out);
+        out = out.chars().map(|c| if c == self.space_mapping { c } else { *last_mixup.get(&c).unwrap() }).collect();
+        format!("{}+{}", general_purpose::STANDARD.encode(nonce), out)
     }
-    pub fn add_cipher(&self, plain_text: &str, rng: &mut SysRng) -> String {
+    pub fn add_cipher(&self, plain_text: &str, rng: &mut StdRng) -> String {
         let key = util::choose::<String>(&self.mixup_keys, rng);
         let mixup = self.mix_ups.get(&key).unwrap();
         let cipher_text: String = plain_text
@@ -130,6 +174,8 @@ impl CipherData {
             .cloned()
             .collect();
         let div_mapping = util::choose(&possible_div_mappings, rng);
+        let mut id:[u8;32] = [0u8;32];
+        rng.try_fill_bytes(&mut id).expect("Failed to make ID");
         let mut data = Self {
             levels: HashMap::new(),
             mix_ups: HashMap::new(),
@@ -138,6 +184,7 @@ impl CipherData {
             mixup_keys: Vec::new(),
             space_mapping,
             div_mapping,
+            data_id: id,
         };
         let adjusted_char_space: Vec<char> = CHAR_SPACE
             .iter()
